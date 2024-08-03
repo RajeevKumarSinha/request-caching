@@ -1,0 +1,66 @@
+version: '3.8'
+services:
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    env_file: 
+      - .env
+    depends_on:
+      mongo:
+        condition: service_healthy
+      memcached:
+        condition: service_started
+      memcached2:
+        condition: service_started
+    environment:
+      - MONGO_URL=mongodb://rootUser:rootUsePassword@mongo:27017/admin
+      - MEMCACHED_HOST=memcached
+      - MEMCACHED_HOST2=memcached2
+    networks:
+      - app-network
+
+  mongo:
+    image: mongo
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: rootUser
+      MONGO_INITDB_ROOT_PASSWORD: rootUsePassword
+    # ports:
+    #   - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+      - ./products.json:/docker-entrypoint-initdb.d/products.json
+      - ./init-mongo.sh:/docker-entrypoint-initdb.d/init-mongo.sh
+    command: ["mongod", "--auth", "--bind_ip_all"]
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  memcached:
+    image: memcached:alpine
+    # ports:
+    #   - "11211:11211"
+    networks:
+      - app-network
+
+  memcached2:
+    image: memcached:alpine
+    # ports:
+    #   - "11212:11211"
+    networks:
+      - app-network
+
+volumes:
+  mongo-data:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge
